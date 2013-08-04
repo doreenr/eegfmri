@@ -41,4 +41,4 @@ def apply_mask(subject_id, bold):
     plt.imshow(np.rot90(mean_img_u[:, :, 5]), interpolation='nearest')
     return X
 
-# apply_mask('009', bold)
+apply_mask('011', bold)

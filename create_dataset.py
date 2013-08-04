@@ -8,20 +8,22 @@ def create_dataset(subject_id):
     from sklearn.datasets.base import Bunch
     import pylab as pl
     import nibabel as nb
+    
+    from remove import remove_range, remove
+
     dataset_name = 'machine_learning'
     runs = 4
     img_data = np.zeros((64,64,33,1))
     lab_data = []
     session_data = []
-    print img_data.shape
-
     for r in range(runs):
         print 'RUN', r
         rv = None
         path = '/gablab/p/eegfmri/analysis/eeg/elists'
         path_all_codes = '/gablab/p/eegfmri/analysis/iaps/all_labels.txt'
-        path_names2 = os.path.join(path, 'IAPS_%s_%s_raw.txt' %(subject_id, r+1))
-        # ecode = np.genfromtxt(path_names, dtype=float)[:,2]
+        path_names2 = os.path.join(path, 'elist_IAPS_%s_%s_raw.txt' %(subject_id, r+1))
+        if subject_id == '009':
+            path_names2 = os.path.join(path, 'elist_IAPS_%s_%s.txt' %(subject_id, r+1)) 
         eegcodes = np.genfromtxt(path_all_codes, dtype=int) [:, 0]
         attributes = np.genfromtxt(path_all_codes, dtype=float) [:, 1:4]
         binary = attributes[:, 2]
@@ -40,7 +42,7 @@ def create_dataset(subject_id):
                     if run_code[i] != 'R128':
                         print i, run_code[i] 
                 if clock[i] != tp[0] and run_code[i] == 'R128':
-                    print 'TR at index', i, 'to remove.'
+                    print 'TR at index', i, 'removed.'
                     run_code[i] = 'remove'
         print 'Numbers of TR identical timepoints', len(cl)
         tr = []
@@ -63,26 +65,37 @@ def create_dataset(subject_id):
                 rv[i] = '-99'
             rv[i] = rv[i].lstrip('S')
             rv[i] = int(rv[i])
+        # remove stimulus codes for responses
         rv = remove_range(rv, 240)
         for idx, i in enumerate(rv):
             for idx2, i2 in enumerate(eegcodes):
-                if i == i2: # and i!= 128:
-                    # print 'rv[idx]', rv[idx], 'aromn[idx2]', aromn[idx2]
+                if i == i2:
                     rv[idx] = binary[idx2]            
-                    # rv[idx] = int(aromn[idx2])
         for idx, i in enumerate(rv):
             if i != -99:
                 rv[idx-1] = i
                 rv[idx] = 0
-        # remove last code from run 1, as last TR was not recorded
-        if r == 0:
-            rv[142] = 0
+        # remove last TR as it was apparently not recorded
+        rv[-1] = 0
         rv = remove(rv, 0)
         for idx, i in enumerate(rv):
             if i == -99:
                 rv[idx] = 0
         unique = sorted(list(set(rv)))
-        print 'Unique values in RV', unique        
+        print 'Unique values in RV', unique  
+        
+        # until now the list with the negative / neutral labels also contains zeros, which we will want to get rid of. 
+        # To do this, we will replace the zeros with the code shown prior
+        # First two values will be deleted later
+        
+        for idx, z in enumerate(rv):
+            if idx <= 2 and z == 0:
+                rv[idx] = -77
+            if idx > 2 and z == 0:
+                rv[idx] = rv[idx-1]
+        unique = sorted(list(set(rv)))
+        print 'Unique values in RV', unique  
+        
         t = open('/gablab/p/eegfmri/analysis/iaps/pilot%s/machine_learning/neg-neutr_attributes_run%s.txt' %(subject_id, r), 'w')
         for i in range(len(rv)):
             t.write("%s, %s" %(rv[i], r))
@@ -100,7 +113,7 @@ def create_dataset(subject_id):
         mean_img_i = np.mean(fmri_data_i, axis=3)
         session_data = np.append(session_data, labels_i[:,1])
         lab_data = np.append(lab_data, labels_i[:,0])
-        img_data = np.concatenate((img_data, fmri_data_i), axis=3)
+        img_data = np.concatenate((img_data, fmri_data_i), axis=3)        
         print '__________________________________________________________________________________________________________'
         if r == 3:
             img_data = img_data[...,1:]
@@ -127,4 +140,4 @@ def create_dataset(subject_id):
             mean_img = np.mean(fmri_data, axis=3)
     return (ds, labels, bold, fmri_data, affine, mean_img)
 
-# ds, labels, bold, fmri_data, affine, mean_img = create_dataset('009')
+ds, labels, bold, fmri_data, affine, mean_img = create_dataset('011')
