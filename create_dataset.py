@@ -81,26 +81,31 @@ def create_dataset(subject_id):
         for idx, i in enumerate(rv):
             if i == -99:
                 rv[idx] = 0
-        unique = sorted(list(set(rv)))
-        print 'Unique values in RV', unique  
         
-        # until now the list with the negative / neutral labels also contains zeros, which we will want to get rid of. 
+        # until now the list with negative / neutral labels also contains zeros, which we will want to get rid of. 
         # To do this, we will replace the zeros with the code shown prior
-        # First two values will be deleted later
+        # First two values will be deleted as well as first two TRs (after fmri_data_i gets assigned
         
         for idx, z in enumerate(rv):
             if idx <= 2 and z == 0:
                 rv[idx] = -77
             if idx > 2 and z == 0:
                 rv[idx] = rv[idx-1]
+                
+        for idx, z in enumerate(rv):
+            if idx <= 1 and z != -77:
+                print 'Warning, non-empty first two TRs were deleted.'
+        
+        rv = remove(rv, -77)
         unique = sorted(list(set(rv)))
         print 'Unique values in RV', unique  
         
         t = open('/gablab/p/eegfmri/analysis/iaps/pilot%s/machine_learning/neg-neutr_attributes_run%s.txt' %(subject_id, r), 'w')
         for i in range(len(rv)):
-            t.write("%s, %s" %(rv[i], r))
+            t.write("%s %s" %(rv[i], r))
             t.write('\n')  
         t.close()
+        
         print 'Labels Length:', len(rv)
         file_name = ['neg-neutr_attributes_run%s.txt' %(r), 'pilot%s_r0%s_bandpassed.nii.gz' %(subject_id, r)]
         fil = _get_dataset(dataset_name, file_name, data_dir='/gablab/p/eegfmri/analysis/iaps/pilot%s' %(subject_id), folder=None)
@@ -108,13 +113,19 @@ def create_dataset(subject_id):
         labels_i = np.loadtxt(ds_i.conditions_target, dtype=np.str)
         bold_i = nb.load(ds_i.func)
         fmri_data_i = np.copy(bold_i.get_data())
-        print 'fMRI data', fmri_data_i.shape
+        print 'Original fMRI data', fmri_data_i.shape
+        
+        fmri_data_i = fmri_data_i[...,2:]
+        print fmri_data_i.shape
+        
         affine = bold_i.get_affine()
         mean_img_i = np.mean(fmri_data_i, axis=3)
         session_data = np.append(session_data, labels_i[:,1])
         lab_data = np.append(lab_data, labels_i[:,0])
         img_data = np.concatenate((img_data, fmri_data_i), axis=3)        
         print '__________________________________________________________________________________________________________'
+        
+        
         if r == 3:
             img_data = img_data[...,1:]
             print 'fMRI image', img_data.shape
@@ -138,6 +149,31 @@ def create_dataset(subject_id):
             affine = bold_i.get_affine() # just choose one
             # Compute the mean EPI: we do the mean along the axis 3, which is time
             mean_img = np.mean(fmri_data, axis=3)
-    return (ds, labels, bold, fmri_data, affine, mean_img)
+            
+    return (ds, labels, bold, fmri_data, affine, mean_img) # later 'ds' will be sufficient
+
+def create_data_run(subject_id, run):
+    import numpy as np
+    import os 
+    from nilearn import datasets
+    from nilearn.datasets import _get_dataset_dir
+    from nilearn.datasets import _get_dataset
+    from sklearn.datasets.base import Bunch
+    import pylab as pl
+    import nibabel as nb
+    dataset_name = 'machine_learning'
+    file_name = ['neg-neutr_attributes_run%s.txt' %(run), 'pilot%s_r0%s_bandpassed.nii.gz' %(subject_id, run)]
+    fil = _get_dataset(dataset_name, file_name, data_dir='/gablab/p/eegfmri/analysis/iaps/pilot%s' %(subject_id), folder=None)
+    ds_i = Bunch(func=fil[1], conditions_target=fil[0])
+    labels_i = np.loadtxt(ds_i.conditions_target, dtype=np.str)
+    bold_i = nb.load(ds_i.func)
+    fmri_data_i = np.copy(bold_i.get_data())
+    print 'Original fMRI data', fmri_data_i.shape    
+    fmri_data_i = fmri_data_i[...,2:]
+    return ds_i
+    
+###################################################################################################################################################################################
 
 ds, labels, bold, fmri_data, affine, mean_img = create_dataset('011')
+
+# ds_1 = create_data_run('011', 1)
