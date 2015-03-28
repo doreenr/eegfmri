@@ -1,4 +1,4 @@
 eegfmri
 =======
 
-Machine Learning model of predicting fMRI activation through EEG data.
+Prediction model of fMRI activation via EEG data. Or, perhaps not.
